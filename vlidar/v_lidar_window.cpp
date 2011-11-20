@@ -27,7 +27,7 @@ public:
 };
 
 VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
-    m_lidar(new urg_t),
+    m_lidar(0),
     ui(new Ui::VLidarWindow),
     m_timer(new QTimer(lidarWindow)),
     m_storage(new long[STORAGE_SIZE])
@@ -44,11 +44,17 @@ VLidarWindow::DPointer::~DPointer()
 
 
 VLidarWindow::VLidarWindow(QWidget *parent) :
+    QDialog(parent),
     d(new DPointer(this))
 {
     d->ui->setupUi(this);
+    connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidar()));
     connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidarGraphics()));
+
     d->m_timer->start(TIMER_TIMEOUT_MS);
+
+    setMinimumSize(MIN_WINDOW_WITH,MIN_WINDOW_HEIGHT);
+    setLayout(d->ui->m_mainLayout);
 }
 
 VLidarWindow::~VLidarWindow()
@@ -82,41 +88,47 @@ void VLidarWindow::disconnectFromLidar()
     }
 }
 
+bool VLidarWindow::isConnectedToLidar()
+{
+    return (d->m_lidar);
+}
+
 void VLidarWindow::updateLidar()
 {
-    if(d->m_lidar)
-    {
-        if(!urg_requestData(d->m_lidar, URG_GD, URG_FIRST, URG_LAST))
-        {
+    if(d->m_lidar){
+        if(!urg_requestData(d->m_lidar, URG_GD, URG_FIRST, URG_LAST)){
             if( urg_receiveData(d->m_lidar, d->m_storage, DPointer::STORAGE_SIZE ) >0 ){
+                d->m_detector.setData(d->m_storage);
             }
         }
     }
-    d->m_detector.setData(d->m_storage);
 }
 
 void VLidarWindow::updateLidarGraphics()
 {
-    updateLidar();
     drawSignal();
     drawSignal2D();
 }
 
 void VLidarWindow::drawSignal2D()
 {
-
+    qDebug() << "Fix me: draw signal 2D";
 }
 
 void VLidarWindow::drawSignal()
 {
-    const long* signal = d->m_detector.getFilteredSignal();
-
-    //Fix me:
-    //Draw signal
-    // I think it's better to use QGraphicsScene::addLine there.
+    qDebug() << "Fix me: draw signal";
 }
 
-void VLidarWindow::writeToFile()
+void VLidarWindow::enableWriteToFile()
 {
-
+    if(d->m_detector.isFileOpened())
+    {
+        qDebug()<< "Fix me:Open QDialog get file name";
+        QString fileName;
+        d->m_detector.openFile(fileName);
+    }else
+    {
+        d->m_detector.closeFile();
+    }
 }

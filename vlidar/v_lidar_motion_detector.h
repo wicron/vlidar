@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <list>
+#include <QString>
+#include <QFile>
 
 namespace cv{
 class Mat;
@@ -30,6 +32,7 @@ public:
         SEGMENTS_SELECTED
     };
 
+    VLidarMotionDetector();
 //    void setData(const cv::Mat &data);
 //    void setData(const std::vector<char> &data);
     void setData(const long* data);
@@ -37,10 +40,20 @@ public:
     bool findMovingObjects(std::list<VLidarSegment> &movingSegments);
     const long* getFilteredSignal();
 
+    bool isFileOpened();
+    void openFile(const QString &newFileName);
+    void closeFile();
+
 protected:
     void segmentate(const cv::Mat &data, std::list<VLidarSegment> &segments);
     bool findSegmentMotion(const cv::Mat &oldSignal, const cv::Mat &newSignal,
                            VLidarSegment &segment);
+
+    void writeToFile();
+
+private:
+    QString m_fileName;
+    QFile m_log;
 };
 
 #endif /*_VLIDAR_MOTION_DETECTOR_*/
