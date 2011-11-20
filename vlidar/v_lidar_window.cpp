@@ -6,8 +6,10 @@
 #include <c_urg/urg_ctrl.h>
 #include <opencv2/core/core.hpp>
 #include <QDebug>
+#include <QFileDialog>
+#include <QErrorMessage>
 
-#define TIMER_TIMEOUT_MS 100
+#define TIMER_TIMEOUT_MS 10000
 
 class VLidarWindow::DPointer
 {
@@ -22,15 +24,25 @@ public:
     long *m_storage;
     cv::Mat m_image2D;
     VLidarMotionDetector m_detector;
+    QErrorMessage m_errorMessage;
+
+    static const char START_LOGGING[];
+    static const char STOP_LOGGING[];
+    static const char FILE_ERROR[];
 
     static const int STORAGE_SIZE = 500;
 };
+
+const char VLidarWindow::DPointer::START_LOGGING[] = "Start logging.";
+const char VLidarWindow::DPointer::STOP_LOGGING[] = "Stop logging.";
+const char VLidarWindow::DPointer::FILE_ERROR[] = "Can't open the file.";
 
 VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
     m_lidar(0),
     ui(new Ui::VLidarWindow),
     m_timer(new QTimer(lidarWindow)),
-    m_storage(new long[STORAGE_SIZE])
+    m_storage(new long[STORAGE_SIZE]),
+    m_errorMessage(lidarWindow)
 {
 };
 
@@ -50,6 +62,7 @@ VLidarWindow::VLidarWindow(QWidget *parent) :
     d->ui->setupUi(this);
     connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidar()));
     connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidarGraphics()));
+    connect(d->ui->m_saveLogButton, SIGNAL(clicked()), this, SLOT(enableWriteToFile()));
 
     d->m_timer->start(TIMER_TIMEOUT_MS);
 
@@ -122,13 +135,21 @@ void VLidarWindow::drawSignal()
 
 void VLidarWindow::enableWriteToFile()
 {
-    if(d->m_detector.isFileOpened())
+    if(!d->m_detector.isFileOpened())
     {
-        qDebug()<< "Fix me:Open QDialog get file name";
-        QString fileName;
+        QString fileName = QFileDialog::getOpenFileName(this,
+                tr("Log file"), "");
+        d->ui->m_fileNameLine->setText(fileName);
         d->m_detector.openFile(fileName);
-    }else
-    {
+
+        if(d->m_detector.isFileOpened()){
+            d->ui->m_saveLogButton->setText(tr(DPointer::STOP_LOGGING));
+        }else{
+            d->m_errorMessage.showMessage(tr(DPointer::FILE_ERROR));
+        }
+
+    }else{
         d->m_detector.closeFile();
+        d->ui->m_saveLogButton->setText(tr(DPointer::START_LOGGING));
     }
 }
