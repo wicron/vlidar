@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QErrorMessage>
+#include <QSplitter>
 
 #define TIMER_TIMEOUT_MS 10000
 
@@ -25,6 +26,7 @@ public:
     cv::Mat m_image2D;
     VLidarMotionDetector m_detector;
     QErrorMessage m_errorMessage;
+    QSplitter m_imageSplitter;
 
     static const char START_LOGGING[];
     static const char STOP_LOGGING[];
@@ -42,7 +44,8 @@ VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
     ui(new Ui::VLidarWindow),
     m_timer(new QTimer(lidarWindow)),
     m_storage(new long[STORAGE_SIZE]),
-    m_errorMessage(lidarWindow)
+    m_errorMessage(lidarWindow),
+    m_imageSplitter(Qt::Vertical)
 {
 };
 
@@ -63,10 +66,18 @@ VLidarWindow::VLidarWindow(QWidget *parent) :
     connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidar()));
     connect(d->m_timer, SIGNAL(timeout()), this, SLOT(updateLidarGraphics()));
     connect(d->ui->m_saveLogButton, SIGNAL(clicked()), this, SLOT(enableWriteToFile()));
+    connect(d->ui->m_connectButton, SIGNAL(clicked()), this, SLOT(connectToLidar()));
+    connect(d->ui->m_disconnectButton, SIGNAL(clicked()), this, SLOT(disconnectFromLidar()));
+    connect(d->ui->m_exitButton, SIGNAL(clicked()), this, SLOT(close()));
 
     d->m_timer->start(TIMER_TIMEOUT_MS);
 
+// Add gui elements
     setMinimumSize(MIN_WINDOW_WITH,MIN_WINDOW_HEIGHT);
+    d->m_imageSplitter.addWidget(d->ui->m_pictureViewer);
+    d->m_imageSplitter.addWidget(d->ui->m_signalViewer);
+    d->ui->m_verticalLayout->addWidget(&(d->m_imageSplitter));
+
     setLayout(d->ui->m_mainLayout);
 }
 
@@ -119,8 +130,10 @@ void VLidarWindow::updateLidar()
 
 void VLidarWindow::updateLidarGraphics()
 {
-    drawSignal();
-    drawSignal2D();
+    if(isConnectedToLidar()){
+        drawSignal();
+        drawSignal2D();
+    }
 }
 
 void VLidarWindow::drawSignal2D()
