@@ -11,3 +11,4 @@ Makefile
 actor.cbp
 *.txt.user
 *.cbp
+Datasheet/*
