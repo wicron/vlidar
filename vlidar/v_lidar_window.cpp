@@ -3,7 +3,6 @@
 #include "v_lidar_motion_detector.h"
 #include <QTimer>
 #include <QString>
-#include <c_urg/urg_ctrl.h>
 #include <opencv2/core/core.hpp>
 #include <QDebug>
 #include <QFileDialog>
@@ -12,12 +11,24 @@
 #include <QGraphicsTextItem>
 #include <QPainter>
 
+#include <qwt.h>
+#include <qwt_plot.h>
+#include <qwt_plot_curve.h>
+#include <qwt_symbol.h>
+
+#ifdef __cplusplus
+extern "C"{
+#include <c_urg/urg_ctrl.h>
+}
+#endif
+
 #define TIMER_TIMEOUT_MS 100
 
 const int VLidarWindow::MEASURMENTS_NUMBER = 800;
 const qreal VLidarWindow::START_PHI = -120;
 const qreal VLidarWindow::FINAL_PHI = 120;
-const qreal VLidarWindow::PHI_SCALE=0.36;
+const qreal VLidarWindow::PHI_SCALE=0.36*3.14/180;
+const qreal VLidarWindow::LIDAR_DISTANCE_SCALE=1000;
 
 class VLidarWindow::DPointer
 {
@@ -30,20 +41,25 @@ public:
     Ui::VLidarWindow *ui;
     QTimer *m_timer;
     long *m_storage;
+    double *m_phi;
+    double *m_radius;
+    double *m_x;
+    double *m_y;
+
     cv::Mat m_image2D;
     VLidarMotionDetector m_detector;
     QErrorMessage m_errorMessage;
     QSplitter m_imageSplitter;
 
-    QGraphicsScene m_graphic2d;
-    QGraphicsScene m_graphic;
-    QPainter m_painter;
+    QwtPlot *m_polarPlot;
+    QwtPlot *m_signalPlot;
+    QwtPlotCurve *m_signalCurve;
+    QwtPlotCurve *m_polarCurve;
 
     static const char START_LOGGING[];
     static const char STOP_LOGGING[];
     static const char FILE_ERROR[];
 
-    static const int STORAGE_SIZE = 500;
 };
 
 const char VLidarWindow::DPointer::START_LOGGING[] = "Start logging.";
@@ -55,12 +71,23 @@ VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
     ui(new Ui::VLidarWindow),
     m_timer(new QTimer(lidarWindow)),
     m_storage(new long[VLidarWindow::MEASURMENTS_NUMBER]),
+
     m_errorMessage(lidarWindow),
     m_imageSplitter(Qt::Vertical),
-    m_graphic(lidarWindow),
-    m_graphic2d(lidarWindow),
-    m_painter(lidarWindow)
+
+    m_polarPlot(new QwtPlot),
+    m_signalPlot(new QwtPlot),
+    m_signalCurve(new QwtPlotCurve),
+    m_polarCurve(new QwtPlotCurve),
+
+    m_phi(new double[VLidarWindow::MEASURMENTS_NUMBER]),
+    m_radius(new double[VLidarWindow::MEASURMENTS_NUMBER]),
+    m_x(new double[VLidarWindow::MEASURMENTS_NUMBER]),
+    m_y(new double[VLidarWindow::MEASURMENTS_NUMBER])
 {
+    for (int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++){
+        m_phi[i] = i*PHI_SCALE;
+    }
 };
 
 VLidarWindow::DPointer::~DPointer()
@@ -69,6 +96,17 @@ VLidarWindow::DPointer::~DPointer()
     delete ui;
     delete m_timer;
     delete[] m_storage;
+
+    delete[] m_phi;
+    delete[] m_radius;
+    delete[] m_x;
+    delete[] m_y;
+
+//By default all attached items are deleted in destructor of plot
+//    delete m_signalCurve;
+//    delete m_polarCurve;
+    delete m_polarPlot;
+    delete m_signalPlot;
 };
 
 
@@ -87,11 +125,19 @@ VLidarWindow::VLidarWindow(QWidget *parent) :
 
     // Add gui elements
     setMinimumSize(MIN_WINDOW_WITH,MIN_WINDOW_HEIGHT);
-    d->m_imageSplitter.addWidget(d->ui->m_pictureViewer);
-    d->m_imageSplitter.addWidget(d->ui->m_signalViewer);
-    d->ui->m_verticalLayout->addWidget(&(d->m_imageSplitter));
-    d->ui->m_signalViewer->setScene(&d->m_graphic);
+    d->m_polarPlot->setTitle(tr("Lidar signal in polar coordinates"));
+    d->m_polarPlot->setTitle(tr("Lidar signal"));
 
+    d->m_imageSplitter.addWidget(d->m_polarPlot);
+    d->m_imageSplitter.addWidget(d->m_signalPlot);
+    d->m_signalCurve->attach(d->m_signalPlot);
+
+    d->m_polarCurve->setStyle(QwtPlotCurve::NoCurve);
+    d->m_polarCurve->setSymbol(new QwtSymbol ( QwtSymbol::Rect, Qt::NoBrush,
+                                              QPen( Qt::darkMagenta ), QSize( 5, 5 ) ) );
+    d->m_polarCurve->attach(d->m_polarPlot);
+
+    d->ui->m_verticalLayout->addWidget(&(d->m_imageSplitter));
     setLayout(d->ui->m_mainLayout);
 }
 
@@ -143,6 +189,13 @@ bool VLidarWindow::updateLidar()
         urg_requestData(d->m_lidar, URG_GD, URG_FIRST, URG_LAST);
         if( urg_receiveData(d->m_lidar, d->m_storage, MEASURMENTS_NUMBER ) >0 ){
             d->m_detector.setData(d->m_storage);
+
+            for(int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++)
+            {
+                d->m_radius[i]=d->m_storage[i]/LIDAR_DISTANCE_SCALE;
+                d->m_x[i]=d->m_radius[i]*cos(d->m_phi[i]);
+                d->m_y[i]=d->m_radius[i]*sin(d->m_phi[i]);
+            }
             return true;
         }
     }
@@ -159,19 +212,12 @@ void VLidarWindow::updateLidarGraphics()
 
 void VLidarWindow::drawSignal2D()
 {
-    qDebug() << "Fix me: draw signal 2D";
+    d->m_polarCurve->setRawSamples(d->m_x, d->m_y, VLidarWindow::MEASURMENTS_NUMBER);
 }
 
 void VLidarWindow::drawSignal()
 {
-    qDebug() << "Fix me: draw signal";
-
-    d->m_graphic.clear();
-    if(drawGraphic<long>(d->m_storage, MEASURMENTS_NUMBER , &d->m_graphic,
-                         d->ui->m_signalViewer->rect(), 10, START_PHI, PHI_SCALE ))
-    {
-        d->ui->m_signalViewer->render(&d->m_painter);
-    }
+    d->m_signalCurve->setRawSamples(d->m_phi, d->m_radius, VLidarWindow::MEASURMENTS_NUMBER);
 }
 
 
