@@ -1,15 +1,14 @@
 #include "v_lidar_window.h"
 #include "vlidar/ui_v_lidar_window.h"
 #include "v_lidar_motion_detector.h"
+#include <opencv2/core/core.hpp>
+
 #include <QTimer>
 #include <QString>
-#include <opencv2/core/core.hpp>
 #include <QDebug>
 #include <QFileDialog>
 #include <QErrorMessage>
 #include <QSplitter>
-#include <QGraphicsTextItem>
-#include <QPainter>
 
 #include <qwt.h>
 #include <qwt_plot.h>

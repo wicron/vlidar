@@ -3,10 +3,6 @@
 
 #include <QWidget>
 #include <QDialog>
-#include <QGraphicsScene>
-#include <QGraphicsTextItem>
-#include <QRect>
-#include <qwt.h>
 
 namespace Ui {
 class VLidarWindow;
