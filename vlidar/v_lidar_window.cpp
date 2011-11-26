@@ -226,7 +226,7 @@ void VLidarWindow::drawSignal()
 
 void VLidarWindow::enableWriteToFile()
 {
-    if(!d->m_detector.isFileOpened())
+    if(!d->m_log.isOpen())
     {
         QString fileName = QFileDialog::getOpenFileName(this,
                                                         tr("Log file"), "");
@@ -250,8 +250,10 @@ void VLidarWindow::enableWriteToFile()
 void VLidarWindow::writeLogToFile()
 {
     if(d->m_log.isOpen()){
+        d->m_logStream << "<scan>" << '\n';
         for (int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++){
-            d->m_logStream << d->m_phi[i] << " " << d->m_radius[i] ;
+            d->m_logStream << d->m_phi[i] << " " << d->m_radius[i] << '\n' ;
         }
+        d->m_logStream << "</scan>" << '\n';
     }
 }
