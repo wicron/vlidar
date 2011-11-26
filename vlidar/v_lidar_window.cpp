@@ -77,7 +77,6 @@ VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
 
     m_errorMessage(lidarWindow),
     m_imageSplitter(Qt::Vertical),
-
     m_polarPlot(new QwtPlot),
     m_signalPlot(new QwtPlot),
     m_signalCurve(new QwtPlotCurve),
@@ -207,6 +206,7 @@ bool VLidarWindow::updateLidar()
 
 void VLidarWindow::updateLidarGraphics()
 {
+    writeLogToFile();
     if(isConnectedToLidar() && updateLidar()){
         drawSignal();
         drawSignal2D();
@@ -215,12 +215,14 @@ void VLidarWindow::updateLidarGraphics()
 
 void VLidarWindow::drawSignal2D()
 {
-    d->m_polarCurve->setRawSamples(d->m_x, d->m_y, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_polarCurve->setSamples(d->m_x, d->m_y, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_polarPlot->replot();
 }
 
 void VLidarWindow::drawSignal()
 {
-    d->m_signalCurve->setRawSamples(d->m_phi, d->m_radius, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_signalCurve->setSamples(d->m_phi, d->m_radius, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_signalPlot->replot();
 }
 
 
