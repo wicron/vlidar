@@ -28,6 +28,7 @@ protected:
     bool updateLidar();
     void drawSignal();
     void drawSignal2D();
+    void writeLogToFile();
 
     bool isConnectedToLidar();
     enum{ MIN_WINDOW_HEIGHT = 200,

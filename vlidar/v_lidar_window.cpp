@@ -9,6 +9,7 @@
 #include <QFileDialog>
 #include <QErrorMessage>
 #include <QSplitter>
+#include <QFile>
 
 #include <qwt.h>
 #include <qwt_plot.h>
@@ -54,6 +55,9 @@ public:
     QwtPlot *m_signalPlot;
     QwtPlotCurve *m_signalCurve;
     QwtPlotCurve *m_polarCurve;
+
+    QFile m_log;
+    QTextStream m_logStream;
 
     static const char START_LOGGING[];
     static const char STOP_LOGGING[];
@@ -227,16 +231,27 @@ void VLidarWindow::enableWriteToFile()
         QString fileName = QFileDialog::getOpenFileName(this,
                                                         tr("Log file"), "");
         d->ui->m_fileNameLine->setText(fileName);
-        d->m_detector.openFile(fileName);
+        d->m_log.setFileName(fileName);
+        d->m_log.open(QIODevice::ReadWrite);
 
-        if(d->m_detector.isFileOpened()){
+        if(d->m_log.isOpen()){
             d->ui->m_saveLogButton->setText(tr(DPointer::STOP_LOGGING));
+            d->m_logStream.setDevice(&d->m_log);
         }else{
             d->m_errorMessage.showMessage(tr(DPointer::FILE_ERROR));
         }
 
     }else{
-        d->m_detector.closeFile();
+        d->m_log.close();
         d->ui->m_saveLogButton->setText(tr(DPointer::START_LOGGING));
+    }
+}
+
+void VLidarWindow::writeLogToFile()
+{
+    if(d->m_log.isOpen()){
+        for (int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++){
+            d->m_logStream << d->m_phi[i] << " " << d->m_radius[i] ;
+        }
     }
 }
