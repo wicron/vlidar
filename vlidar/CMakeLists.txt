@@ -7,11 +7,13 @@ INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR})
 
 SET(SOURCE_FILES
     main.cpp
-    v_lidar_motion_detector.cpp
-    v_lidar_window.cpp)
+#    v_lidar_motion_detector.cpp
+    v_lidar_window.cpp
+)
 
 SET(HEADER_FILES
-    v_lidar_motion_detector.h)
+#    v_lidar_motion_detector.h
+)
 SET(GUI_HEADER_FILES
     v_lidar_window.h)
 
