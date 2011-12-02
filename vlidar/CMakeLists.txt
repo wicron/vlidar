@@ -9,6 +9,7 @@ SET(SOURCE_FILES
     main.cpp
 #    v_lidar_motion_detector.cpp
     v_lidar_window.cpp
+    v_lidar.cpp
 )
 
 SET(HEADER_FILES

@@ -25,6 +25,7 @@ protected slots:
     void enableWriteToFile();
 
 protected:
+    void updateButtons();
     bool updateLidar();
     void drawSignal();
     void drawSignal2D();

@@ -16,19 +16,9 @@
 #include <qwt_plot_curve.h>
 #include <qwt_symbol.h>
 
-#ifdef __cplusplus
-extern "C"{
-#include <c_urg/urg_ctrl.h>
-}
-#endif
+#include "v_lidar.h"
 
-#define TIMER_TIMEOUT_MS 100
-
-const int VLidarWindow::MEASURMENTS_NUMBER = 800;
-const qreal VLidarWindow::START_PHI = -120;
-const qreal VLidarWindow::FINAL_PHI = 120;
-const qreal VLidarWindow::PHI_SCALE=0.36*3.14/180;
-const qreal VLidarWindow::LIDAR_DISTANCE_SCALE=1000;
+#define TIMER_TIMEOUT_MS 200
 
 class VLidarWindow::DPointer
 {
@@ -37,16 +27,11 @@ public:
     ~DPointer();
 
 public:
-    urg_t *m_lidar;
     Ui::VLidarWindow *ui;
     QTimer *m_timer;
-    long *m_storage;
-    double *m_phi;
-    double *m_radius;
-    double *m_x;
-    double *m_y;
 
-//    VLidarMotionDetector m_detector;
+    VLidar m_lidar;
+
     QErrorMessage m_errorMessage;
     QSplitter m_imageSplitter;
 
@@ -57,51 +42,25 @@ public:
 
     QFile m_log;
     QTextStream m_logStream;
-
-    static const char START_LOGGING[];
-    static const char STOP_LOGGING[];
-    static const char FILE_ERROR[];
-
 };
 
-const char VLidarWindow::DPointer::START_LOGGING[] = "Start logging.";
-const char VLidarWindow::DPointer::STOP_LOGGING[] = "Stop logging.";
-const char VLidarWindow::DPointer::FILE_ERROR[] = "Can't open the file.";
-
 VLidarWindow::DPointer::DPointer(VLidarWindow *lidarWindow):
-    m_lidar(0),
     ui(new Ui::VLidarWindow),
     m_timer(new QTimer(lidarWindow)),
-    m_storage(new long[VLidarWindow::MEASURMENTS_NUMBER]),
 
     m_errorMessage(lidarWindow),
     m_imageSplitter(Qt::Vertical),
     m_polarPlot(new QwtPlot),
     m_signalPlot(new QwtPlot),
     m_signalCurve(new QwtPlotCurve),
-    m_polarCurve(new QwtPlotCurve),
-
-    m_phi(new double[VLidarWindow::MEASURMENTS_NUMBER]),
-    m_radius(new double[VLidarWindow::MEASURMENTS_NUMBER]),
-    m_x(new double[VLidarWindow::MEASURMENTS_NUMBER]),
-    m_y(new double[VLidarWindow::MEASURMENTS_NUMBER])
+    m_polarCurve(new QwtPlotCurve)
 {
-    for (int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++){
-        m_phi[i] = i*PHI_SCALE;
-    }
 };
 
 VLidarWindow::DPointer::~DPointer()
 {
-    delete m_lidar;
     delete ui;
     delete m_timer;
-    delete[] m_storage;
-
-    delete[] m_phi;
-    delete[] m_radius;
-    delete[] m_x;
-    delete[] m_y;
 
 //By default all attached items are deleted in destructor of plot
 //    delete m_signalCurve;
@@ -149,58 +108,31 @@ VLidarWindow::~VLidarWindow()
 
 void VLidarWindow::connectToLidar()
 {
-    if(!d->m_lidar)
-    {
-        d->m_lidar = new urg_t;
-        urg_initialize(d->m_lidar);
-        int result = urg_connect(d->m_lidar, d->ui->m_lidarName->text().toAscii().data(),
-                                 d->ui->m_baudRate->text().toLong());
-        if(result >=0){
-            d->ui->m_connectButton->setEnabled(false);
-            d->ui->m_disconnectButton->setEnabled(true);
-        }else{
-            d->ui->m_connectButton->setEnabled(true);
-            d->ui->m_disconnectButton->setEnabled(false);
-            delete d->m_lidar;
-            d->m_lidar = 0;
-        }
-    }
+    d->m_lidar.connect(d->ui->m_lidarName->text(), d->ui->m_baudRate->text().toLong());
+    updateButtons();
+}
+
+void VLidarWindow::updateButtons() {
+    bool connected = d->m_lidar.connected();
+
+    d->ui->m_connectButton->setEnabled(!connected);
+    d->ui->m_disconnectButton->setEnabled(connected);
 }
 
 void VLidarWindow::disconnectFromLidar()
 {
-    if(d->m_lidar)
-    {
-        urg_disconnect(d->m_lidar);
-        delete d->m_lidar;
-        d->m_lidar =0;
-        d->ui->m_connectButton->setEnabled(true);
-        d->ui->m_disconnectButton->setEnabled(false);
-    }
+    d->m_lidar.disconnect();
+    updateButtons();
 }
 
 bool VLidarWindow::isConnectedToLidar()
 {
-    return (d->m_lidar);
+    return d->m_lidar.connected();
 }
 
 bool VLidarWindow::updateLidar()
 {
-    if(d->m_lidar){
-        urg_requestData(d->m_lidar, URG_GD, URG_FIRST, URG_LAST);
-        if( urg_receiveData(d->m_lidar, d->m_storage, MEASURMENTS_NUMBER ) >0 ){
-//            d->m_detector.setData(d->m_storage);
-
-            for(int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++)
-            {
-                d->m_radius[i]=d->m_storage[i]/LIDAR_DISTANCE_SCALE;
-                d->m_x[i]=d->m_radius[i]*cos(d->m_phi[i]);
-                d->m_y[i]=d->m_radius[i]*sin(d->m_phi[i]);
-            }
-            return true;
-        }
-    }
-    return false;
+    return d->m_lidar.update();
 }
 
 void VLidarWindow::updateLidarGraphics()
@@ -214,13 +146,13 @@ void VLidarWindow::updateLidarGraphics()
 
 void VLidarWindow::drawSignal2D()
 {
-    d->m_polarCurve->setSamples(d->m_x, d->m_y, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_polarCurve->setSamples(d->m_lidar.cartesian());
     d->m_polarPlot->replot();
 }
 
 void VLidarWindow::drawSignal()
 {
-    d->m_signalCurve->setSamples(d->m_phi, d->m_radius, VLidarWindow::MEASURMENTS_NUMBER);
+    d->m_signalCurve->setSamples(d->m_lidar.angles(), d->m_lidar.distances());
     d->m_signalPlot->replot();
 }
 
@@ -236,15 +168,15 @@ void VLidarWindow::enableWriteToFile()
         d->m_log.open(QIODevice::ReadWrite);
 
         if(d->m_log.isOpen()){
-            d->ui->m_saveLogButton->setText(tr(DPointer::STOP_LOGGING));
+            d->ui->m_saveLogButton->setText(tr("Stop logging"));
             d->m_logStream.setDevice(&d->m_log);
         }else{
-            d->m_errorMessage.showMessage(tr(DPointer::FILE_ERROR));
+            d->m_errorMessage.showMessage(tr("Can't open the file"));
         }
 
     }else{
         d->m_log.close();
-        d->ui->m_saveLogButton->setText(tr(DPointer::START_LOGGING));
+        d->ui->m_saveLogButton->setText(tr("Start logging"));
     }
 }
 
@@ -252,8 +184,11 @@ void VLidarWindow::writeLogToFile()
 {
     if(d->m_log.isOpen()){
         d->m_logStream << "<scan>" << '\n';
-        for (int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++){
-            d->m_logStream << d->m_phi[i] << " " << d->m_radius[i] << '\n' ;
+        const QVector<double> &angles = d->m_lidar.angles();
+        const QVector<double> &distances = d->m_lidar.distances();
+
+        for(int i = 0; i < angles.size(); i++) {
+            d->m_logStream << angles[i] << " " << distances[i] << '\n';
         }
         d->m_logStream << "</scan>" << '\n';
     }
