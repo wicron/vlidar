@@ -22,12 +22,13 @@ IF(QT4_FOUND)
     /usr/local/include
     /usr/include/qwt
     /usr/include
+    $ENV{QWTROOT}/include
     )
 
     SET(QWT_NAMES ${QWT_NAMES} qwt libqwt)
     FIND_LIBRARY(QWT_LIBRARY
         NAMES ${QWT_NAMES}
-        PATHS /usr/local/qwt/lib /usr/local/lib /usr/lib
+        PATHS /usr/local/qwt/lib /usr/local/lib /usr/lib $ENV{QWTROOT}/lib
     )
 
     IF (QWT_LIBRARY)
