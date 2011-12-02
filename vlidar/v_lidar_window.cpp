@@ -1,6 +1,6 @@
 #include "v_lidar_window.h"
 #include "vlidar/ui_v_lidar_window.h"
-#include "v_lidar_motion_detector.h"
+//#include "v_lidar_motion_detector.h"
 #include <opencv2/core/core.hpp>
 
 #include <QTimer>
@@ -46,8 +46,7 @@ public:
     double *m_x;
     double *m_y;
 
-    cv::Mat m_image2D;
-    VLidarMotionDetector m_detector;
+//    VLidarMotionDetector m_detector;
     QErrorMessage m_errorMessage;
     QSplitter m_imageSplitter;
 
@@ -190,7 +189,7 @@ bool VLidarWindow::updateLidar()
     if(d->m_lidar){
         urg_requestData(d->m_lidar, URG_GD, URG_FIRST, URG_LAST);
         if( urg_receiveData(d->m_lidar, d->m_storage, MEASURMENTS_NUMBER ) >0 ){
-            d->m_detector.setData(d->m_storage);
+//            d->m_detector.setData(d->m_storage);
 
             for(int i=0; i<VLidarWindow::MEASURMENTS_NUMBER; i++)
             {
